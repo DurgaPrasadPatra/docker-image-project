@@ -1,7 +1,7 @@
 # 1. Run HTTPD
 sudo docker run -d --name wbpg -p 80:80 httpd
 
-# 2. Kee[ all files in wbpage directory ,then Copy website into container
+# 2. Keep all files in wbpage directory ,then Copy website into container
 sudo docker cp ~/webpage/. wbpg:/usr/local/apache2/htdocs/
 
 # 3. Verify
