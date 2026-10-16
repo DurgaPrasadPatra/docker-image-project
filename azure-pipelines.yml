@@ -3,17 +3,41 @@
 # Add steps that build, run tests, deploy, and more:
 # https://aka.ms/yaml
 
+
+# Run when code is pushed to master
 trigger:
-- master
+  - master
 
-pool:selfhosted-agent-pool-durga
-
+# Select your self-hosted agent pool
+pool:
+  name: 'selfhosted-agent-pool-durga'
 
 steps:
-- task: ArchiveFiles@2
-  inputs:
-    rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
-    includeRootFolder: false
-    archiveType: 'zip'
-    archiveFile: '$(System.DefaultWorkingDirectory)/$(Build.BuildId).zip'
-    replaceExistingArchive: true
+  # STEP 1: Download repository files to the agent
+  - checkout: self
+    displayName: 'Checkout source code'
+
+  # STEP 2: Verify where the agent downloaded the files
+  - task: Bash@3
+    displayName: 'Check working directory'
+    inputs:
+      targetType: 'inline'
+      script: |
+        echo "Default working directory:"
+        echo "$(System.DefaultWorkingDirectory)"
+
+        echo "Repository files:"
+        ls -la "$(System.DefaultWorkingDirectory)"
+
+        echo "Current directory:"
+        pwd
+
+  # STEP 3: Create a ZIP archive
+  - task: ArchiveFiles@2
+    displayName: 'Archive source files'
+    inputs:
+      rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+      replaceExistingArchive: true
