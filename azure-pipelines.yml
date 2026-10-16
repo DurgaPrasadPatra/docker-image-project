@@ -3,36 +3,20 @@
 # Add steps that build, run tests, deploy, and more:
 # https://aka.ms/yaml
 
-
-# Run when code is pushed to master
+# Trigger when code is pushed to master
 trigger:
   - master
 
-# Select your self-hosted agent pool
+# Use your existing self-hosted agent pool
 pool:
   name: 'selfhosted-agent-pool-durga'
 
 steps:
-  # STEP 1: Download repository files to the agent
+  # STEP 1: Download repository files
   - checkout: self
     displayName: 'Checkout source code'
 
-  # STEP 2: Verify where the agent downloaded the files
-  - task: Bash@3
-    displayName: 'Check working directory'
-    inputs:
-      targetType: 'inline'
-      script: |
-        echo "Default working directory:"
-        echo "$(System.DefaultWorkingDirectory)"
-
-        echo "Repository files:"
-        ls -la "$(System.DefaultWorkingDirectory)"
-
-        echo "Current directory:"
-        pwd
-
-  # STEP 3: Create a ZIP archive
+  # STEP 2: Create a ZIP archive
   - task: ArchiveFiles@2
     displayName: 'Archive source files'
     inputs:
@@ -41,3 +25,56 @@ steps:
       archiveType: 'zip'
       archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
       replaceExistingArchive: true
+
+  # STEP 3: Deploy files to Apache
+  - task: Bash@3
+    displayName: 'Deploy website to Apache'
+    inputs:
+      targetType: 'inline'
+      script: |
+        # Source directory containing the checked-out website
+        SOURCE_DIR="$(System.DefaultWorkingDirectory)"
+
+        # Apache document root on Ubuntu
+        WEB_ROOT="/var/www/html"
+
+        # Confirm the website entry file exists
+        test -f "$SOURCE_DIR/index.html" || {
+          echo "ERROR: index.html was not found"
+          exit 1
+        }
+
+        # Create Apache document root if needed
+        sudo mkdir -p "$WEB_ROOT"
+
+        # Copy website files, excluding Git metadata and pipeline ZIPs
+        sudo rsync -av \
+          --exclude='.git/' \
+          --exclude='*.zip' \
+          "$SOURCE_DIR/" "$WEB_ROOT/"
+
+        # Ensure Apache can read the deployed files
+        sudo chmod -R a+rX "$WEB_ROOT"
+
+        # Check Apache configuration
+        sudo apache2ctl configtest
+
+        # Reload Apache to serve the updated files
+        sudo systemctl reload apache2
+
+        echo "Deployment completed"
+
+  # STEP 4: Verify the deployed website
+  - task: Bash@3
+    displayName: 'Verify website'
+    inputs:
+      targetType: 'inline'
+      script: |
+        # Check that Apache returns a successful response
+        curl --fail --show-error --silent \
+          http://localhost/ -o /dev/null
+
+        # Check the deployed HTML file exists
+        test -f /var/www/html/index.html
+
+        echo "Website deployment verified"
